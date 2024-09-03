@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Polygon;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
@@ -14,6 +13,7 @@ import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
+import java.util.List;
 import java.util.Scanner;
 
 import javax.swing.JFrame;
@@ -23,7 +23,7 @@ import javax.swing.SwingUtilities;
 public class GlobePanel extends JPanel implements MouseMotionListener, MouseListener, MouseWheelListener, KeyListener {
     
     private static final float MIN_CAMERA_ZOOM = 0.1f, MAX_CAMERA_ZOOM = 10f;
-    private static final float CAMERA_ZOOM_STEP = 0.025f;
+    private static final float CAMERA_ZOOM_MULTIPLIER = 1.025f;
 
     /**
      * Mouse X and Y positions recorded when the left mouse button was initially pressed
@@ -61,7 +61,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
      */
     private float zoomScalar = 1;
 
-    private final MapCountry kosovo;
+    private final List<MapShapeData> worldMapShapes;
 
     public GlobePanel() {
         super();
@@ -75,9 +75,9 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         // Reuse default font but set size to 10.pt
         setFont(getFont().deriveFont(10.f));
 
-        Scanner scannerKosovo = new Scanner(GlobePanel.class.getResourceAsStream("/Kosovo.txt"));
-        kosovo = MapCountry.parsePolygon(scannerKosovo);
-        scannerKosovo.close();
+        Scanner scannerWorldMap = new Scanner(GlobePanel.class.getResourceAsStream("/World.txt"));
+        worldMapShapes = MapShapeData.parseWorldMapFile(scannerWorldMap);
+        scannerWorldMap.close();
     }
 
     private void paintDebug(Graphics g) {
@@ -115,20 +115,9 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         g2d.setColor(Color.PINK);
         g2d.setStroke(new BasicStroke(5.f));
 
-        Polygon polyKosovo = kosovo.getPolygon();
-        // Rectangle boundsKosovo = polyKosovo.getBounds();
-        // g2d.drawRect(boundsKosovo.x, boundsKosovo.y, boundsKosovo.width, boundsKosovo.height);
-        g2d.drawPolygon(polyKosovo);
-
-        Polygon testPoly = new Polygon();
-        testPoly.addPoint(0, 0);
-        testPoly.addPoint(-50, 0);
-        testPoly.addPoint(-50, -50);
-        testPoly.addPoint(-30, -80);
-
-        // Rectangle boundaryKosovo = kosovo.projectSVGBoundary(currentWorldX, currentWorldY, zoomScalar);
-
-        // g.drawRect(boundaryKosovo.x, boundaryKosovo.y, boundaryKosovo.width, boundaryKosovo.height);
+        for (MapShapeData mapShape : worldMapShapes) {
+            g2d.drawPolygon(mapShape.getPolygon());
+        }
 
         g2d.setTransform(originalTransform);
 
@@ -202,7 +191,11 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
     }
 
     public void mouseWheelMoved(MouseWheelEvent e) {
-        zoomScalar -= (float)e.getUnitsToScroll() * CAMERA_ZOOM_STEP;
+        if (e.getUnitsToScroll() < 0) {
+            zoomScalar *= CAMERA_ZOOM_MULTIPLIER;
+        } else {
+            zoomScalar /= CAMERA_ZOOM_MULTIPLIER;
+        }
         // Clamp to min and max
         zoomScalar = Math.max(MIN_CAMERA_ZOOM, zoomScalar);
         zoomScalar = Math.min(MAX_CAMERA_ZOOM, zoomScalar);
