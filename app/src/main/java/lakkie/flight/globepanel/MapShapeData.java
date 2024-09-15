@@ -22,6 +22,7 @@ public class MapShapeData {
      * Points in the polygon. May be relative to each other or absolute positions depending on this.relativePoints
      */
     private float[] xPoints, yPoints;
+    
     private Polygon polygon = null;
     /**
      * Whether all the points in the xPoints and yPoints arrays are relative to each other.
@@ -34,11 +35,12 @@ public class MapShapeData {
         this.numPoints = numPoints;
         this.xPoints = new float[numPoints];
         this.yPoints = new float[numPoints];
+        this.relativePoints = relativePoints;
     }
 
     private void updatePolygonRelative() {
-        int[] polyPointsX = new int[numPoints];
-        int[] polyPointsY = new int[numPoints];
+        int[] polyPointsX = new int[numPoints + 1];
+        int[] polyPointsY = new int[numPoints + 1];
         // Start at the offset position
         int currentXScaled = (int) Math.floor(this.x * POLYGON_SCALE);
         int currentYScaled = (int) Math.floor(this.y * POLYGON_SCALE);
@@ -51,12 +53,15 @@ public class MapShapeData {
             polyPointsY[i] = currentYScaled;
         }
 
+        polyPointsX[numPoints] = (int) Math.floor(this.x * POLYGON_SCALE);
+        polyPointsY[numPoints] = (int) Math.floor(this.y * POLYGON_SCALE);
+
         this.polygon = new Polygon(polyPointsX, polyPointsY, numPoints);
     }
 
     private void updatePolygonAbsolute() {
-        int[] polyPointsX = new int[numPoints];
-        int[] polyPointsY = new int[numPoints];
+        int[] polyPointsX = new int[numPoints + 1];
+        int[] polyPointsY = new int[numPoints + 1];
         int offsetXScaled = (int) Math.floor(this.x * POLYGON_SCALE);
         int offsetYScaled = (int) Math.floor(this.y * POLYGON_SCALE);
         for (int i = 0; i < numPoints; i++) {
@@ -155,6 +160,8 @@ public class MapShapeData {
                     // Skip this line. Absolute or relative points must be specified
                     continue;
             }
+
+            break;
         }
 
         return mapShapes;
