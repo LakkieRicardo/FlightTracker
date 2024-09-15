@@ -1,7 +1,6 @@
 package lakkie.flight.globepanel;
 
 import java.awt.Polygon;
-import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -13,7 +12,7 @@ public class MapShapeData {
     /**
      * The offset of all xPoints and yPoints in the shape.
      */
-    public float x = 0, y = 0;
+    public float offsetX = 0, offsetY = 0;
     /**
      * The total number of points in the polygon. Always equal to xPoints.length or yPoints.length.
      */
@@ -22,77 +21,90 @@ public class MapShapeData {
      * Points in the polygon. May be relative to each other or absolute positions depending on this.relativePoints
      */
     private float[] xPoints, yPoints;
-    
-    private Polygon polygon = null;
+
+    /**
+     * The number of points to put into polygon. This should only ever be increased.
+     */
+    private volatile int targetPointsGenerate = 0;
+
+    /**
+     * The final polygon to display. Should never be written to outside of the generateNewPoints function.
+     */
+    private Polygon polygon;
     /**
      * Whether all the points in the xPoints and yPoints arrays are relative to each other.
      */
     private boolean relativePoints;
 
-    private MapShapeData(float x, float y, int numPoints, boolean relativePoints) {
-        this.x = x;
-        this.y = y;
+    /**
+     * 
+     * @param offsetX Starting X
+     * @param offsetY Starting y
+     * @param numPoints The number of points, including the
+     * starting point and excluding the final point that wraps back around to the start.
+     */
+    private MapShapeData(float offsetX, float offsetY, int numPoints, boolean relativePoints) {
+        this.offsetX = offsetX;
+        this.offsetY = offsetY;
         this.numPoints = numPoints;
         this.xPoints = new float[numPoints];
         this.yPoints = new float[numPoints];
         this.relativePoints = relativePoints;
+        this.polygon = new Polygon(new int[] {}, new int[] {}, 0);
     }
 
-    private void updatePolygonRelative() {
+    /**
+     * Worker thread that will generate new points when targetPointsGenerate is updated.
+     * Will not write to targetPointsGenerate itself.
+     */
+    private void generateNewPointsRelative() {
         int[] polyPointsX = new int[numPoints + 1];
         int[] polyPointsY = new int[numPoints + 1];
-        // Start at the offset position
-        int currentXScaled = (int) Math.floor(this.x * POLYGON_SCALE);
-        int currentYScaled = (int) Math.floor(this.y * POLYGON_SCALE);
+        // While we're not done generating this shape
+        while (targetPointsGenerate < numPoints) {
+            // polygon.npoints represents how many points we've generated so far
+            if (polygon.npoints < targetPointsGenerate) {
+                // Generate the first point based off offsetX and offsetY
+                int startX = (int) Math.floor(this.offsetX * POLYGON_SCALE);
+                int startY = (int) Math.floor(this.offsetY * POLYGON_SCALE);
+                if (polygon.npoints == 0) {
+                    polyPointsX[0] = startX;
+                    polyPointsY[0] = startY;
+                    synchronized (polygon) {
+                        polygon = new Polygon(new int[] { startX }, new int[] { startY }, 1);
+                    }
+                }
 
-        for (int i = 0; i < numPoints; i++) {
-            currentXScaled += (int) Math.floor(POLYGON_SCALE * xPoints[i]);
-            currentYScaled += (int) Math.floor(POLYGON_SCALE * yPoints[i]);
-            
-            polyPointsX[i] = currentXScaled;
-            polyPointsY[i] = currentYScaled;
+                int currentX = polyPointsX[polygon.npoints - 1];
+                int currentY = polyPointsY[polygon.npoints - 1];
+
+                for (int i = polygon.npoints; i < targetPointsGenerate && i < xPoints.length; i++) {
+                    currentX += (int) Math.floor(POLYGON_SCALE * xPoints[i]);
+                    currentY += (int) Math.floor(POLYGON_SCALE * yPoints[i]);
+                    polyPointsX[i] = currentX;
+                    polyPointsY[i] = currentY;
+                }
+
+                // We also have to generate the final point, which leads back to the start
+                if (targetPointsGenerate == xPoints.length) {
+                    polyPointsX[numPoints] = startX;
+                    polyPointsY[numPoints] = startY;
+                }
+
+                synchronized (polygon) {
+                    polygon = new Polygon(polyPointsX, polyPointsY, targetPointsGenerate);
+                }
+            }
         }
-
-        polyPointsX[numPoints] = (int) Math.floor(this.x * POLYGON_SCALE);
-        polyPointsY[numPoints] = (int) Math.floor(this.y * POLYGON_SCALE);
-
-        this.polygon = new Polygon(polyPointsX, polyPointsY, numPoints);
     }
 
-    private void updatePolygonAbsolute() {
-        int[] polyPointsX = new int[numPoints + 1];
-        int[] polyPointsY = new int[numPoints + 1];
-        int offsetXScaled = (int) Math.floor(this.x * POLYGON_SCALE);
-        int offsetYScaled = (int) Math.floor(this.y * POLYGON_SCALE);
-        for (int i = 0; i < numPoints; i++) {
-            // Absolute points, treat currentX and currentY as the starting point and add our current point to that
-            // We do not modify currentX and currentY
-            polyPointsX[i] = (int) Math.floor(POLYGON_SCALE * xPoints[i]) + offsetXScaled;
-            polyPointsY[i] = (int) Math.floor(POLYGON_SCALE * yPoints[i]) + offsetYScaled;
-        }
-
-        this.polygon = new Polygon(polyPointsX, polyPointsY, numPoints);
-    }
-
-    private void updatePolygon() {
-        if (this.relativePoints) {
-            updatePolygonRelative();
-        } else {
-            updatePolygonAbsolute();
+    public void requestNewPoint() {
+        if (targetPointsGenerate <= xPoints.length) {
+            targetPointsGenerate++;
         }
     }
 
     public Polygon getPolygon() {
-        // No points were set
-        if (polygon == null) {
-            return null;
-        }
-
-        Rectangle bounds = polygon.getBounds();
-        if (bounds.x != this.x || bounds.y != this.y) {
-            updatePolygon();
-        }
-
         return polygon;
     }
 
@@ -135,13 +147,13 @@ public class MapShapeData {
             mapShape.setPoint(i, xPoints.get(i), yPoints.get(i));
         }
 
-        // Create renderable Polygon object
-        mapShape.updatePolygon();
+        // Create thread to generate points when requested
+        new Thread(mapShape::generateNewPointsRelative, "Generate Points").start();
 
         return mapShape;
     }
 
-    public static List<MapShapeData> parseWorldMapFile(Scanner input) {
+    public static MapShapeData parseWorldMapFile(Scanner input) {
         List<MapShapeData> mapShapes = new ArrayList<MapShapeData>();
 
         while (input.hasNextLine()) {
@@ -151,10 +163,10 @@ public class MapShapeData {
                     // Comment, ignore
                     continue;
                 case 'R':
-                    mapShapes.add(parsePolygon(shape.substring(1), true));
-                    break;
+                    return parsePolygon(shape.substring(1), true);
+                    
                 case 'A':
-                    mapShapes.add(parsePolygon(shape.substring(1), false));
+                    // mapShapes.add(parsePolygon(shape.substring(1), false));
                     break;
                 default:
                     // Skip this line. Absolute or relative points must be specified
@@ -164,7 +176,8 @@ public class MapShapeData {
             break;
         }
 
-        return mapShapes;
+        // return mapShapes;
+        return null;
     }
 
 }

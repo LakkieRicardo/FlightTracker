@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Polygon;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
@@ -61,7 +62,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
      */
     private float zoomScalar = 1;
 
-    private final List<MapShapeData> worldMapShapes;
+    private final MapShapeData debugShape;
 
     public GlobePanel() {
         super();
@@ -76,7 +77,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         setFont(getFont().deriveFont(10.f));
 
         Scanner scannerWorldMap = new Scanner(GlobePanel.class.getResourceAsStream("/World.txt"));
-        worldMapShapes = MapShapeData.parseWorldMapFile(scannerWorldMap);
+        debugShape = MapShapeData.parseWorldMapFile(scannerWorldMap);
         scannerWorldMap.close();
     }
 
@@ -115,8 +116,9 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         g2d.setColor(Color.PINK);
         g2d.setStroke(new BasicStroke(5.f));
 
-        for (MapShapeData mapShape : worldMapShapes) {
-            g2d.drawPolygon(mapShape.getPolygon());
+        Polygon polygon = debugShape.getPolygon();
+        synchronized (polygon) {
+            g2d.drawPolygon(polygon);
         }
 
         g2d.setTransform(originalTransform);
@@ -211,6 +213,11 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
 	public void keyPressed(KeyEvent e) {
         if (e.getKeyCode() == KeyEvent.VK_CONTROL) {
             showMouseCoords = true;
+            SwingUtilities.invokeLater(this::repaint);
+        }
+        if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+            debugShape.requestNewPoint();
+            System.out.println("Draw new point");
             SwingUtilities.invokeLater(this::repaint);
         }
 	}
