@@ -7,7 +7,7 @@ import java.util.Scanner;
 
 public class MapShapeData {
 
-    private static final float POLYGON_SCALE = 10.f;
+    public static final float POLYGON_SCALE = 10.f;
 
     /**
      * The offset of all xPoints and yPoints in the shape.
@@ -20,21 +20,24 @@ public class MapShapeData {
     /**
      * Points in the polygon. May be relative to each other or absolute positions depending on this.relativePoints
      */
-    private float[] xPoints, yPoints;
+    float[] xPoints, yPoints;
 
     /**
      * The number of points to put into polygon. This should only ever be increased.
      */
-    private volatile int targetPointsGenerate = 0;
+    volatile int targetPointsGenerate = 0;
+
+    int[] polyPointsX;
+    int[] polyPointsY;
 
     /**
      * The final polygon to display. Should never be written to outside of the generateNewPoints function.
      */
-    private Polygon polygon;
+    Polygon polygon;
     /**
      * Whether all the points in the xPoints and yPoints arrays are relative to each other.
      */
-    private boolean relativePoints;
+    boolean relativePoints;
 
     /**
      * 
@@ -51,56 +54,24 @@ public class MapShapeData {
         this.yPoints = new float[numPoints];
         this.relativePoints = relativePoints;
         this.polygon = new Polygon(new int[] {}, new int[] {}, 0);
-    }
-
-    /**
-     * Worker thread that will generate new points when targetPointsGenerate is updated.
-     * Will not write to targetPointsGenerate itself.
-     */
-    private void generateNewPointsRelative() {
-        int[] polyPointsX = new int[numPoints + 1];
-        int[] polyPointsY = new int[numPoints + 1];
-        // While we're not done generating this shape
-        while (targetPointsGenerate < numPoints) {
-            // polygon.npoints represents how many points we've generated so far
-            if (polygon.npoints < targetPointsGenerate) {
-                // Generate the first point based off offsetX and offsetY
-                int startX = (int) Math.floor(this.offsetX * POLYGON_SCALE);
-                int startY = (int) Math.floor(this.offsetY * POLYGON_SCALE);
-                if (polygon.npoints == 0) {
-                    polyPointsX[0] = startX;
-                    polyPointsY[0] = startY;
-                    synchronized (polygon) {
-                        polygon = new Polygon(new int[] { startX }, new int[] { startY }, 1);
-                    }
-                }
-
-                int currentX = polyPointsX[polygon.npoints - 1];
-                int currentY = polyPointsY[polygon.npoints - 1];
-
-                for (int i = polygon.npoints; i < targetPointsGenerate && i < xPoints.length; i++) {
-                    currentX += (int) Math.floor(POLYGON_SCALE * xPoints[i]);
-                    currentY += (int) Math.floor(POLYGON_SCALE * yPoints[i]);
-                    polyPointsX[i] = currentX;
-                    polyPointsY[i] = currentY;
-                }
-
-                // We also have to generate the final point, which leads back to the start
-                if (targetPointsGenerate == xPoints.length) {
-                    polyPointsX[numPoints] = startX;
-                    polyPointsY[numPoints] = startY;
-                }
-
-                synchronized (polygon) {
-                    polygon = new Polygon(polyPointsX, polyPointsY, targetPointsGenerate);
-                }
-            }
+        if (relativePoints) {
+            this.polyPointsX = new int[numPoints + 1];
+            this.polyPointsY = new int[numPoints + 1];
+        } else {
+            this.polyPointsX = new int[numPoints];
+            this.polyPointsY = new int[numPoints];
         }
     }
 
     public void requestNewPoint() {
-        if (targetPointsGenerate <= xPoints.length) {
-            targetPointsGenerate++;
+        if (this.relativePoints) {
+            if (targetPointsGenerate <= xPoints.length) {
+                targetPointsGenerate++;
+            }
+        } else {
+            if (targetPointsGenerate < xPoints.length) {
+                targetPointsGenerate++;
+            }
         }
     }
 
@@ -147,13 +118,10 @@ public class MapShapeData {
             mapShape.setPoint(i, xPoints.get(i), yPoints.get(i));
         }
 
-        // Create thread to generate points when requested
-        new Thread(mapShape::generateNewPointsRelative, "Generate Points").start();
-
         return mapShape;
     }
 
-    public static MapShapeData parseWorldMapFile(Scanner input) {
+    public static List<MapShapeData> parseWorldMapFile(Scanner input) {
         List<MapShapeData> mapShapes = new ArrayList<MapShapeData>();
 
         while (input.hasNextLine()) {
@@ -163,21 +131,18 @@ public class MapShapeData {
                     // Comment, ignore
                     continue;
                 case 'R':
-                    return parsePolygon(shape.substring(1), true);
-                    
+                    mapShapes.add(parsePolygon(shape.substring(1), true));
+                    break;
                 case 'A':
-                    // mapShapes.add(parsePolygon(shape.substring(1), false));
+                    mapShapes.add(parsePolygon(shape.substring(1), false));
                     break;
                 default:
                     // Skip this line. Absolute or relative points must be specified
                     continue;
             }
-
-            break;
         }
 
-        // return mapShapes;
-        return null;
+        return mapShapes;
     }
 
 }

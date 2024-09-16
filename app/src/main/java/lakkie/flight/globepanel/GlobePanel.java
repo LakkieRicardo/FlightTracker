@@ -62,7 +62,8 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
      */
     private float zoomScalar = 1;
 
-    private final MapShapeData debugShape;
+    private final List<MapShapeData> mapShapes;
+    private final MapShapeGenerator mapShapeGenerator;
 
     public GlobePanel() {
         super();
@@ -77,8 +78,11 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         setFont(getFont().deriveFont(10.f));
 
         Scanner scannerWorldMap = new Scanner(GlobePanel.class.getResourceAsStream("/World.txt"));
-        debugShape = MapShapeData.parseWorldMapFile(scannerWorldMap);
+        mapShapes = MapShapeData.parseWorldMapFile(scannerWorldMap);
         scannerWorldMap.close();
+
+        mapShapeGenerator = new MapShapeGenerator(mapShapes);
+        new Thread(mapShapeGenerator::generateNewPoints, "Generate Shapes").start();
     }
 
     private void paintDebug(Graphics g) {
@@ -116,9 +120,11 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         g2d.setColor(Color.PINK);
         g2d.setStroke(new BasicStroke(5.f));
 
-        Polygon polygon = debugShape.getPolygon();
-        synchronized (polygon) {
-            g2d.drawPolygon(polygon);
+        for (MapShapeData shape : mapShapes) {
+            Polygon polygon = shape.getPolygon();
+            synchronized (polygon) {
+                g2d.drawPolygon(polygon);
+            }
         }
 
         g2d.setTransform(originalTransform);
@@ -216,7 +222,9 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
             SwingUtilities.invokeLater(this::repaint);
         }
         if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-            debugShape.requestNewPoint();
+            for (MapShapeData mapShape : mapShapes) {
+                mapShape.requestNewPoint();
+            }
             System.out.println("Draw new point");
             SwingUtilities.invokeLater(this::repaint);
         }
