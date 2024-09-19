@@ -61,6 +61,8 @@ public class MapShapeData {
             this.polyPointsX = new int[numPoints];
             this.polyPointsY = new int[numPoints];
         }
+
+        targetPointsGenerate = numPoints;
     }
 
     public void requestNewPoint() {

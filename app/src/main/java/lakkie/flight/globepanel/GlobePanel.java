@@ -21,6 +21,8 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
+import lakkie.flight.globepanel.ProjectionConverter.Point;
+
 public class GlobePanel extends JPanel implements MouseMotionListener, MouseListener, MouseWheelListener, KeyListener {
     
     private static final float MIN_CAMERA_ZOOM = 0.1f, MAX_CAMERA_ZOOM = 10f;
@@ -64,6 +66,8 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
 
     private final List<MapShapeData> mapShapes;
     private final MapShapeGenerator mapShapeGenerator;
+    private final ProjectionConverter projector;
+    private final Point testPoint;
 
     public GlobePanel() {
         super();
@@ -83,6 +87,10 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
 
         mapShapeGenerator = new MapShapeGenerator(mapShapes);
         new Thread(mapShapeGenerator::generateNewPoints, "Generate Shapes").start();
+
+        projector = new ProjectionConverter(2000, 857, 0, 0);
+        testPoint = projector.projectToScreen(9.477428703979816, -62.9371994835163);
+        System.out.println(testPoint);
     }
 
     private void paintDebug(Graphics g) {
@@ -126,6 +134,9 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
                 g2d.drawPolygon(polygon);
             }
         }
+
+        g2d.setColor(Color.BLUE);
+        g2d.drawRect((int)testPoint.x(), (int)testPoint.y(), 50, 50);
 
         g2d.setTransform(originalTransform);
 
@@ -199,6 +210,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
     }
 
     public void mouseWheelMoved(MouseWheelEvent e) {
+        // TODO fix touchpad scroll
         if (e.getUnitsToScroll() < 0) {
             zoomScalar *= CAMERA_ZOOM_MULTIPLIER;
         } else {
