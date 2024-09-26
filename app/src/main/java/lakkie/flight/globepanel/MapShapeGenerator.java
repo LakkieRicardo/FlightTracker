@@ -23,11 +23,6 @@ public class MapShapeGenerator {
                     generateNewPointsAbsolute(shape);
                 }
             }
-
-            if (!printedMax) {
-                printedMax = true;
-                System.out.printf("max x: %d, max y: %d\n", maxX, maxY);
-            }
         }
     }
 

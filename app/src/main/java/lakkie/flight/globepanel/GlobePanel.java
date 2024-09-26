@@ -89,7 +89,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         new Thread(mapShapeGenerator::generateNewPoints, "Generate Shapes").start();
 
         projector = new ProjectionConverter(2000, 857, 0, 0);
-        testPoint = projector.projectToScreen(9.477428703979816, -62.9371994835163);
+        testPoint = projector.projectToScreen(32.57437390867866, 40.2239248502662);
         System.out.println(testPoint);
     }
 
