@@ -7,21 +7,16 @@ public class MapShapeGenerator {
     
     private final List<MapShapeData> shapes;
 
-    private int maxX = 0, maxY = 0;
-    private boolean printedMax = false;
-
     public MapShapeGenerator(List<MapShapeData> shapes) {
         this.shapes = shapes;
     }
 
     public void generateNewPoints() {
-        while (true) {
-            for (MapShapeData shape : shapes) {
-                if (shape.relativePoints) {
-                    generateNewPointsRelative(shape);
-                } else {
-                    generateNewPointsAbsolute(shape);
-                }
+        for (MapShapeData shape : shapes) {
+            if (shape.relativePoints) {
+                generateNewPointsRelative(shape);
+            } else {
+                generateNewPointsAbsolute(shape);
             }
         }
     }
@@ -52,12 +47,6 @@ public class MapShapeGenerator {
                 currentY += (int) Math.floor(MapShapeData.POLYGON_SCALE * s.yPoints[i]);
                 s.polyPointsX[i] = currentX;
                 s.polyPointsY[i] = currentY;
-                if (currentX > maxX) {
-                    maxX = currentX;
-                }
-                if (currentY > maxY) {
-                    maxY = currentY;
-                }
             }
 
             // We also have to generate the final point, which leads back to the start

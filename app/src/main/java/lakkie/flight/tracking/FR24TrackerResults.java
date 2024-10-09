@@ -15,18 +15,16 @@ import java.time.Duration;
 
 import ca.fuzzlesoft.JsonParse;
 
-public record FR24TrackerResults(int responseCode, List<FR24Aircraft> aircraft) {
+public class FR24TrackerResults {
 
-    public boolean isValid() {
-        return responseCode == 200 && aircraft != null;
-    }
+    private FR24TrackerResults() { }
 
     /**
      * Synchronously queries the flight tracker server for the tracked flights at the time this function was called.
      * @param source The server to query with %d being the placeholder for the current time.
      * @return
      */
-    public static FR24TrackerResults queryTracker(String source) throws IOException, InterruptedException {
+    public static List<FR24Aircraft> queryTracker(String source) throws IOException, InterruptedException {
         long currentTimeSec = System.currentTimeMillis() / 1000L;
         String formattedSource = String.format(source, currentTimeSec);
         HttpClient client = HttpClient.newBuilder()
@@ -71,7 +69,7 @@ public record FR24TrackerResults(int responseCode, List<FR24Aircraft> aircraft) 
             parsedFlights.add(new FR24Aircraft(lat.doubleValue(), lng.doubleValue(), callsign, altitude.doubleValue()));
         }
 
-        return new FR24TrackerResults(response.statusCode(), parsedFlights);
+        return parsedFlights;
     }
 
 }

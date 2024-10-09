@@ -14,6 +14,7 @@ import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
@@ -66,7 +67,9 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
 
     private final List<MapShapeData> mapShapes;
     private final MapShapeGenerator mapShapeGenerator;
-    private final ProjectionConverter projector;
+    public final ProjectionConverter projector;
+    public List<Point> projectedTrackedAircraft = new ArrayList<>();
+    public List<Point> testPointList = new ArrayList<>();
     private final Point testPoint;
 
     public GlobePanel() {
@@ -88,12 +91,21 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         mapShapeGenerator = new MapShapeGenerator(mapShapes);
         new Thread(mapShapeGenerator::generateNewPoints, "Generate Shapes").start();
 
-        projector = new ProjectionConverter(2000, 857, 0, 0);
-        testPoint = projector.projectToScreen(32.57437390867866, 40.2239248502662);
-        System.out.println(testPoint);
+        projector = new ProjectionConverter(19990, 8560, 0, 0);
+
+        // new Thread(() -> FR24TrackerThread.trackAircraft(this), "Track Aircraft").start();
+        for (double lat = -90; lat <= 90; lat += 10) {
+            for (double lng = -180; lng <= 180; lng += 20) {
+                projectedTrackedAircraft.add(projector.projectToScreen(lat, lng));
+            }
+        }
+
+        testPoint = projector.projectToScreen(1.4857324446887663, 104.27097943273563);
+        TestData.loadFromFile(testPointList, GlobePanel.class.getResourceAsStream("/TestPoints.json"));
     }
 
     private void paintDebug(Graphics g) {
+        g.setColor(Color.WHITE);
         g.drawString("World X: " + currentWorldX, 5, 15);
         g.drawString("World Y: " + currentWorldY, 5, 25);
         g.drawString("Zoom Scalar " + zoomScalar, 5, 35);
@@ -103,6 +115,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
     }
 
     private AffineTransform getCameraTransform(AffineTransform originalTransform) {
+        // FIXME change camera zoom to middle of screen
         // Move to the center of the image
         AffineTransform cameraTransform = AffineTransform.getTranslateInstance(getWidth() / 2, getHeight() / 2);
         cameraTransform.concatenate(AffineTransform.getScaleInstance(zoomScalar, zoomScalar));
@@ -136,7 +149,17 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         }
 
         g2d.setColor(Color.BLUE);
-        g2d.drawRect((int)testPoint.x(), (int)testPoint.y(), 50, 50);
+        g2d.setStroke(new BasicStroke(2.f));
+        synchronized (projectedTrackedAircraft) {
+            for (Point aircraft : projectedTrackedAircraft) {
+                g2d.drawRect((int)aircraft.x() - 5, (int)aircraft.y() - 5, 10, 10);
+            }
+        }
+
+        g2d.drawRect(10, 10, 19990, 8560);
+
+        g2d.setColor(Color.GREEN);
+        g2d.drawRect((int)testPoint.x() - 5, (int)testPoint.y() - 5, 10, 10);
 
         g2d.setTransform(originalTransform);
 

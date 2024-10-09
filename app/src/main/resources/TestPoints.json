@@ -1,0 +1,27 @@
+[
+    {
+        "Label": "Northwest Tip of NZ",
+        "Latitude": -34.43957857331345,
+        "Longitude": 172.84157118098855
+    },
+    {
+        "Label": "South of Singapore",
+        "Latitude": 1.266732539558067,
+        "Longitude": 103.81391397960031
+    },
+    {
+        "Label": "North Tip of Jutland",
+        "Latitude": 57.61675375970641,
+        "Longitude": 10.265548178783767
+    },
+    {
+        "Label": "South Tip of Baja",
+        "Latitude": 22.868640830894567,
+        "Longitude": -109.96142086840165
+    },
+    {
+        "Label": "Cape Town",
+        "Latitude": -33.90849910863552,
+        "Longitude": 18.41521109072584
+    }
+]
