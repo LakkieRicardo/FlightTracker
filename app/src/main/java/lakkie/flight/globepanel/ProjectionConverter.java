@@ -30,14 +30,20 @@ public class ProjectionConverter {
     }
 
     public Point projectToScreen(double lat, double lng) {
-        // lat *= 1.365D;
-        lng *= 1.071D;
-
         lat = Math.min(90, lat);
         lat = Math.max(-90, lat);
 
-        // lng = Math.min(180, lng);
-        // lng = Math.max(-180, lng);
+        Point point = project(lat, lng);
+        double canvasX = point.x + (mapWidth / 2);
+        double canvasY = (mapHeight / 2) - point.y;
+        return new Point(canvasX, canvasY + 750);
+    }
+
+    public Point projectToScreenNew(double lat, double lng) {
+        lat *= 1.1D;
+
+        lat = Math.min(90, lat);
+        lat = Math.max(-90, lat);
 
         Point point = project(lat, lng);
         double canvasX = point.x + (mapWidth / 2);

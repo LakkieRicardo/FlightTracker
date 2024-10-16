@@ -68,10 +68,10 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
     private final List<MapShapeData> mapShapes;
     private final MapShapeGenerator mapShapeGenerator;
     public final ProjectionConverter projector;
-    public List<Point> projectedTrackedAircraft = new ArrayList<>();
-    public List<Point> testPointList = new ArrayList<>();
-    private final Point testPoint;
-
+    public List<Point> oldProjectionPoints = new ArrayList<>(), newProjectionPoints = new ArrayList<>();
+    public List<TestPoint> oldTestPointList = new ArrayList<>();
+    public List<TestPoint> newTestPointList = new ArrayList<>();
+    
     public GlobePanel() {
         super();
         setMinimumSize(new Dimension(400, 300));
@@ -96,12 +96,13 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         // new Thread(() -> FR24TrackerThread.trackAircraft(this), "Track Aircraft").start();
         for (double lat = -90; lat <= 90; lat += 10) {
             for (double lng = -180; lng <= 180; lng += 20) {
-                projectedTrackedAircraft.add(projector.projectToScreen(lat, lng));
+                oldProjectionPoints.add(projector.projectToScreen(lat, lng));
+                newProjectionPoints.add(projector.projectToScreenNew(lat, lng));
             }
         }
 
-        testPoint = projector.projectToScreen(1.4857324446887663, 104.27097943273563);
-        TestData.loadFromFile(testPointList, GlobePanel.class.getResourceAsStream("/TestPoints.json"));
+        TestPoint.loadFromFile(oldTestPointList, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, false);
+        TestPoint.loadFromFile(newTestPointList, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, true);
     }
 
     private void paintDebug(Graphics g) {
@@ -112,6 +113,10 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         if (showMouseCoords) {
             g.drawString(String.format("(%d, %d)", mouseX, mouseY), mouseX, mouseY);
         }
+        g.setColor(Color.BLUE);
+        g.drawString("BLUE is old", 5, 45);
+        g.setColor(Color.RED);
+        g.drawString("RED is new", 5, 55);
     }
 
     private AffineTransform getCameraTransform(AffineTransform originalTransform) {
@@ -137,7 +142,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         AffineTransform originalTransform = g2d.getTransform();
         g2d.setTransform(getCameraTransform(originalTransform));
 
-        // Draw foreground
+        // Draw map
         g2d.setColor(Color.PINK);
         g2d.setStroke(new BasicStroke(5.f));
 
@@ -148,18 +153,22 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
             }
         }
 
+        // Draw old points (coordinate test and label test points)
         g2d.setColor(Color.BLUE);
         g2d.setStroke(new BasicStroke(2.f));
-        synchronized (projectedTrackedAircraft) {
-            for (Point aircraft : projectedTrackedAircraft) {
-                g2d.drawRect((int)aircraft.x() - 5, (int)aircraft.y() - 5, 10, 10);
-            }
+        for (Point projPoint : oldProjectionPoints) {
+            g2d.drawRect((int)projPoint.x() - 5, (int)projPoint.y() - 5, 10, 10);
         }
+        TestPoint.render(g2d, oldTestPointList);
+
+        // Draw new points (coordinate test and label test points)
+        g2d.setColor(Color.RED);
+        for (Point projPoint : newProjectionPoints) {
+            g2d.drawRect((int)projPoint.x() - 5, (int)projPoint.y() - 5, 10, 10);
+        }
+        TestPoint.render(g2d, newTestPointList);
 
         g2d.drawRect(10, 10, 19990, 8560);
-
-        g2d.setColor(Color.GREEN);
-        g2d.drawRect((int)testPoint.x() - 5, (int)testPoint.y() - 5, 10, 10);
 
         g2d.setTransform(originalTransform);
 
@@ -255,12 +264,14 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         if (e.getKeyCode() == KeyEvent.VK_CONTROL) {
             showMouseCoords = true;
             SwingUtilities.invokeLater(this::repaint);
-        }
-        if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+        } else if (e.getKeyCode() == KeyEvent.VK_ENTER) {
             for (MapShapeData mapShape : mapShapes) {
                 mapShape.requestNewPoint();
             }
             System.out.println("Draw new point");
+            SwingUtilities.invokeLater(this::repaint);
+        } else if (e.getKeyChar() == KeyEvent.VK_EQUALS) {
+            zoomScalar = 1;
             SwingUtilities.invokeLater(this::repaint);
         }
 	}

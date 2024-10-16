@@ -20,8 +20,8 @@ public class FR24TrackerThread {
 
                 System.out.printf("Fetched %d flights\n", projectedTrackedFlights.size());
 
-                synchronized (updateMap.projectedTrackedAircraft) {
-                    updateMap.projectedTrackedAircraft = projectedTrackedFlights;
+                synchronized (updateMap.oldProjectionPoints) {
+                    updateMap.oldProjectionPoints = projectedTrackedFlights;
                 }
             } catch (IOException | InterruptedException e) {
                 System.err.println("Failed to fetch tracked flights!");
