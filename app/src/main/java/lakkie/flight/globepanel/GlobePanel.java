@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
+import java.awt.Image;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
@@ -14,6 +15,7 @@ import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.geom.AffineTransform;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -21,6 +23,8 @@ import java.util.Scanner;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+
+import javax.imageio.ImageIO;
 
 import lakkie.flight.globepanel.ProjectionConverter.Point;
 
@@ -68,9 +72,10 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
     private final List<MapShapeData> mapShapes;
     private final MapShapeGenerator mapShapeGenerator;
     public final ProjectionConverter projector;
-    public List<Point> oldProjectionPoints = new ArrayList<>(), newProjectionPoints = new ArrayList<>();
-    public List<TestPoint> oldTestPointList = new ArrayList<>();
-    public List<TestPoint> newTestPointList = new ArrayList<>();
+    public List<Point> projectionPoints1 = new ArrayList<>(), projectionPoints2 = new ArrayList<>();
+    public List<TestPoint> testPointList1 = new ArrayList<>();
+    public List<TestPoint> testPointList2 = new ArrayList<>();
+    public Image mapImage;
     
     public GlobePanel() {
         super();
@@ -91,18 +96,26 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         mapShapeGenerator = new MapShapeGenerator(mapShapes);
         new Thread(mapShapeGenerator::generateNewPoints, "Generate Shapes").start();
 
-        projector = new ProjectionConverter(19990, 8560, 0, 0);
+        projector = new ProjectionConverter(20450, 10350, 0, 0);
 
         // new Thread(() -> FR24TrackerThread.trackAircraft(this), "Track Aircraft").start();
         for (double lat = -90; lat <= 90; lat += 10) {
             for (double lng = -180; lng <= 180; lng += 20) {
-                oldProjectionPoints.add(projector.projectToScreen(lat, lng));
-                newProjectionPoints.add(projector.projectToScreenNew(lat, lng));
+                projectionPoints1.add(projector.projectToScreen1(lat, lng));
+                projectionPoints2.add(projector.projectToScreen2(lat, lng));
             }
         }
 
-        TestPoint.loadFromFile(oldTestPointList, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, false);
-        TestPoint.loadFromFile(newTestPointList, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, true);
+        TestPoint.loadFromFile(testPointList1, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, false);
+        TestPoint.loadFromFile(testPointList2, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, true);
+
+        try {
+            mapImage = ImageIO.read(GlobePanel.class.getResourceAsStream("/Robinson_with_Tissot's_Indicatrices_of_Distortion.png"));
+        } catch (IOException e) {
+            System.err.println("Failed to load test image!");
+            mapImage = null;
+            e.printStackTrace();
+        }
     }
 
     private void paintDebug(Graphics g) {
@@ -111,6 +124,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         g.drawString("World Y: " + currentWorldY, 5, 25);
         g.drawString("Zoom Scalar " + zoomScalar, 5, 35);
         if (showMouseCoords) {
+            g.setColor(Color.BLACK);
             g.drawString(String.format("(%d, %d)", mouseX, mouseY), mouseX, mouseY);
         }
         g.setColor(Color.BLUE);
@@ -142,6 +156,10 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         AffineTransform originalTransform = g2d.getTransform();
         g2d.setTransform(getCameraTransform(originalTransform));
 
+        if (mapImage != null) {
+            g2d.drawImage(mapImage, -355, -141, 20450, 10350, null);
+        }
+
         // Draw map
         g2d.setColor(Color.PINK);
         g2d.setStroke(new BasicStroke(5.f));
@@ -153,22 +171,20 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
             }
         }
 
-        // Draw old points (coordinate test and label test points)
+        // Draw points with func 2 (coordinate test and label test points)
         g2d.setColor(Color.BLUE);
-        g2d.setStroke(new BasicStroke(2.f));
-        for (Point projPoint : oldProjectionPoints) {
-            g2d.drawRect((int)projPoint.x() - 5, (int)projPoint.y() - 5, 10, 10);
+        g2d.setStroke(new BasicStroke(5.f));
+        for (Point projPoint : projectionPoints1) {
+            g2d.fillRect((int)projPoint.x() - 10, (int)projPoint.y() - 10, 20, 20);
         }
-        TestPoint.render(g2d, oldTestPointList);
+        TestPoint.render(g2d, testPointList1);
 
-        // Draw new points (coordinate test and label test points)
-        g2d.setColor(Color.RED);
-        for (Point projPoint : newProjectionPoints) {
-            g2d.drawRect((int)projPoint.x() - 5, (int)projPoint.y() - 5, 10, 10);
-        }
-        TestPoint.render(g2d, newTestPointList);
-
-        g2d.drawRect(10, 10, 19990, 8560);
+        // Draw points with func 2 (coordinate test and label test points)
+        // g2d.setColor(Color.RED);
+        // for (Point projPoint : projectionPoints2) {
+        //     g2d.fillRect((int)projPoint.x() - 10, (int)projPoint.y() - 10, 20, 20);
+        // }
+        // TestPoint.render(g2d, testPointList2);
 
         g2d.setTransform(originalTransform);
 

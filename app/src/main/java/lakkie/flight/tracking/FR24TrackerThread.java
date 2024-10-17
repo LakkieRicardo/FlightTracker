@@ -15,13 +15,13 @@ public class FR24TrackerThread {
                 List<FR24Aircraft> results = FR24TrackerResults.queryTracker(System.getProperty("FR24_SERVER_URL"));
                 List<Point> projectedTrackedFlights = new ArrayList<>();
                 for(FR24Aircraft aircraft : results) {
-                    projectedTrackedFlights.add(updateMap.projector.projectToScreen(aircraft.lat(), aircraft.lng()));
+                    projectedTrackedFlights.add(updateMap.projector.projectToScreen1(aircraft.lat(), aircraft.lng()));
                 }
 
                 System.out.printf("Fetched %d flights\n", projectedTrackedFlights.size());
 
-                synchronized (updateMap.oldProjectionPoints) {
-                    updateMap.oldProjectionPoints = projectedTrackedFlights;
+                synchronized (updateMap.projectionPoints1) {
+                    updateMap.projectionPoints1 = projectedTrackedFlights;
                 }
             } catch (IOException | InterruptedException e) {
                 System.err.println("Failed to fetch tracked flights!");
