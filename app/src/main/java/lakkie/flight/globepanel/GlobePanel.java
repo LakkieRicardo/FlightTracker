@@ -124,7 +124,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         g.drawString("World Y: " + currentWorldY, 5, 25);
         g.drawString("Zoom Scalar " + zoomScalar, 5, 35);
         if (showMouseCoords) {
-            g.setColor(Color.BLACK);
+            g.setColor(Color.GREEN);
             g.drawString(String.format("(%d, %d)", mouseX, mouseY), mouseX, mouseY);
         }
         g.setColor(Color.BLUE);
@@ -156,6 +156,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
         AffineTransform originalTransform = g2d.getTransform();
         g2d.setTransform(getCameraTransform(originalTransform));
 
+        // TODO make this toggleable
         if (mapImage != null) {
             g2d.drawImage(mapImage, -355, -141, 20450, 10350, null);
         }

@@ -4,8 +4,7 @@ package lakkie.flight.globepanel;
 
 public class ProjectionConverter {
 
-    // public static final int CANVAS_OFFSET_X = -275, CANVAS_OFFSET_Y = 690;
-    public static final int CANVAS_OFFSET_X = -355, CANVAS_OFFSET_Y = -141;
+    public static final int CANVAS_OFFSET_X = -355, CANVAS_OFFSET_Y = -140;
 
     private double mapWidth;
     private double mapHeight;
@@ -33,7 +32,7 @@ public class ProjectionConverter {
         Point point = project(lat, lng);
         double canvasX = point.x + (mapWidth / 2);
         double canvasY = (mapHeight / 2) - point.y;
-        return new Point(canvasX, canvasY);
+        return new Point(canvasX + CANVAS_OFFSET_X, canvasY + CANVAS_OFFSET_Y);
     }
 
     public Point projectToScreen2(double lat, double lng) {
