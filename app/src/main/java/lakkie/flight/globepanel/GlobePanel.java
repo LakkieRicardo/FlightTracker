@@ -158,7 +158,7 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
 
         // TODO make this toggleable
         if (mapImage != null) {
-            g2d.drawImage(mapImage, -355, -141, 20450, 10350, null);
+            g2d.drawImage(mapImage, -355, -159, 20430, 10345, null);
         }
 
         // Draw map
