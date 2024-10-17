@@ -3,6 +3,7 @@ package lakkie.flight.globepanel;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
@@ -27,11 +28,16 @@ import javax.swing.SwingUtilities;
 import javax.imageio.ImageIO;
 
 import lakkie.flight.globepanel.ProjectionConverter.Point;
+import lakkie.flight.tracking.FR24Aircraft;
+import lakkie.flight.tracking.FR24TrackerThread;
 
 public class GlobePanel extends JPanel implements MouseMotionListener, MouseListener, MouseWheelListener, KeyListener {
     
     private static final float MIN_CAMERA_ZOOM = 0.1f, MAX_CAMERA_ZOOM = 10f;
     private static final float CAMERA_ZOOM_MULTIPLIER = 1.025f;
+
+    private static final Font PLANE_INFO_FONT = new Font("Courier New", Font.BOLD, 6);
+    private static final Font DEBUG_FONT = new Font("Courier New", Font.PLAIN, 14);
 
     /**
      * Mouse X and Y positions recorded when the left mouse button was initially pressed
@@ -69,13 +75,19 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
      */
     private float zoomScalar = 1;
 
-    private final List<MapShapeData> mapShapes;
-    private final MapShapeGenerator mapShapeGenerator;
+    private boolean drawMapInfo = false;
+
     public final ProjectionConverter projector;
-    public List<Point> projectionPoints1 = new ArrayList<>(), projectionPoints2 = new ArrayList<>();
-    public List<TestPoint> testPointList1 = new ArrayList<>();
-    public List<TestPoint> testPointList2 = new ArrayList<>();
+    private final MapShapeGenerator mapShapeGenerator;
+    private final List<MapShapeData> mapShapes;
     public Image mapImage;
+    public List<Point> projectionPoints = new ArrayList<>();
+    public List<TestPoint> testPointList = new ArrayList<>();
+    
+    public final Object planeLock = new Object();
+    public List<Point> planePositions = new ArrayList<>();
+    public List<FR24Aircraft> planeInfo = new ArrayList<>();
+    public long planeLastUpdate = System.currentTimeMillis();
     
     public GlobePanel() {
         super();
@@ -98,16 +110,14 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
 
         projector = new ProjectionConverter(20450, 10350, 0, 0);
 
-        // new Thread(() -> FR24TrackerThread.trackAircraft(this), "Track Aircraft").start();
+        new Thread(() -> FR24TrackerThread.trackAircraft(this), "Track Aircraft").start();
         for (double lat = -90; lat <= 90; lat += 10) {
             for (double lng = -180; lng <= 180; lng += 20) {
-                projectionPoints1.add(projector.projectToScreen1(lat, lng));
-                projectionPoints2.add(projector.projectToScreen2(lat, lng));
+                projectionPoints.add(projector.projectToScreen(lat, lng));
             }
         }
 
-        TestPoint.loadFromFile(testPointList1, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, false);
-        TestPoint.loadFromFile(testPointList2, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector, true);
+        TestPoint.loadFromFile(testPointList, GlobePanel.class.getResourceAsStream("/TestPoints.json"), projector);
 
         try {
             mapImage = ImageIO.read(GlobePanel.class.getResourceAsStream("/Robinson_with_Tissot's_Indicatrices_of_Distortion.png"));
@@ -119,18 +129,20 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
     }
 
     private void paintDebug(Graphics g) {
+        g.setFont(DEBUG_FONT);
         g.setColor(Color.WHITE);
         g.drawString("World X: " + currentWorldX, 5, 15);
-        g.drawString("World Y: " + currentWorldY, 5, 25);
-        g.drawString("Zoom Scalar " + zoomScalar, 5, 35);
+        g.drawString("World Y: " + currentWorldY, 5, 30);
+        g.drawString(String.format("Zoom Scalar: %.2f (Reset: press =)", zoomScalar), 5, 45);
+        synchronized (planeLock) {
+            g.drawString("Tracked flights: " + planeInfo.size(), 5, 60);
+            g.drawString(String.format("Flights last updated: %dms ago", (System.currentTimeMillis() - planeLastUpdate)), 5, 75);
+        }
+        g.drawString(String.format("Showing map overlay: %b (Toggle: press \\)", drawMapInfo), 5, 90);
         if (showMouseCoords) {
             g.setColor(Color.GREEN);
             g.drawString(String.format("(%d, %d)", mouseX, mouseY), mouseX, mouseY);
         }
-        g.setColor(Color.BLUE);
-        g.drawString("BLUE is old", 5, 45);
-        g.setColor(Color.RED);
-        g.drawString("RED is new", 5, 55);
     }
 
     private AffineTransform getCameraTransform(AffineTransform originalTransform) {
@@ -153,15 +165,24 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
             return;
         }
 
+        g2d.setFont(PLANE_INFO_FONT);
+
+        // Prepare transform for world space
         AffineTransform originalTransform = g2d.getTransform();
         g2d.setTransform(getCameraTransform(originalTransform));
 
-        // TODO make this toggleable
-        if (mapImage != null) {
+        // Info for debugging map alignment
+        if (drawMapInfo && mapImage != null) {
             g2d.drawImage(mapImage, -355, -159, 20430, 10345, null);
+            g2d.setColor(Color.BLUE);
+            g2d.setStroke(new BasicStroke(5.f));
+            for (Point projPoint : projectionPoints) {
+                g2d.fillRect((int)projPoint.x() - 10, (int)projPoint.y() - 10, 20, 20);
+            }
+            TestPoint.render(g2d, testPointList);
         }
 
-        // Draw map
+        // Draw actual map
         g2d.setColor(Color.PINK);
         g2d.setStroke(new BasicStroke(5.f));
 
@@ -172,23 +193,21 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
             }
         }
 
-        // Draw points with func 2 (coordinate test and label test points)
-        g2d.setColor(Color.BLUE);
-        g2d.setStroke(new BasicStroke(5.f));
-        for (Point projPoint : projectionPoints1) {
-            g2d.fillRect((int)projPoint.x() - 10, (int)projPoint.y() - 10, 20, 20);
+        // Draw planes
+        g2d.setColor(Color.RED);
+        g2d.setStroke(new BasicStroke(2.f));
+        synchronized (planeLock) {
+            for (int i = 0; i < planePositions.size(); i++) {
+                Point point = planePositions.get(i);
+                g2d.fillRect((int)point.x() - 2, (int)point.y() - 2, 4, 4);
+                String callsign = planeInfo.get(i).callsign().toUpperCase();
+                int callsignWidth = g2d.getFontMetrics().stringWidth(callsign);
+                g2d.drawString(callsign, (int)point.x() - callsignWidth / 2, (int)point.y() + 8);
+            }
         }
-        TestPoint.render(g2d, testPointList1);
 
-        // Draw points with func 2 (coordinate test and label test points)
-        // g2d.setColor(Color.RED);
-        // for (Point projPoint : projectionPoints2) {
-        //     g2d.fillRect((int)projPoint.x() - 10, (int)projPoint.y() - 10, 20, 20);
-        // }
-        // TestPoint.render(g2d, testPointList2);
-
+        // Reset transform for UI
         g2d.setTransform(originalTransform);
-
         paintDebug(g2d);
     }
 
@@ -289,6 +308,9 @@ public class GlobePanel extends JPanel implements MouseMotionListener, MouseList
             SwingUtilities.invokeLater(this::repaint);
         } else if (e.getKeyChar() == KeyEvent.VK_EQUALS) {
             zoomScalar = 1;
+            SwingUtilities.invokeLater(this::repaint);
+        } else if (e.getKeyChar() == KeyEvent.VK_BACK_SLASH) {
+            drawMapInfo = !drawMapInfo;
             SwingUtilities.invokeLater(this::repaint);
         }
 	}

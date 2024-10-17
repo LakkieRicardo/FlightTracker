@@ -28,22 +28,11 @@ public class ProjectionConverter {
         this.offsetY = offsetY;
     }
 
-    public Point projectToScreen1(double lat, double lng) {
+    public Point projectToScreen(double lat, double lng) {
         Point point = project(lat, lng);
         double canvasX = point.x + (mapWidth / 2);
         double canvasY = (mapHeight / 2) - point.y;
         return new Point(canvasX + CANVAS_OFFSET_X, canvasY + CANVAS_OFFSET_Y);
-    }
-
-    public Point projectToScreen2(double lat, double lng) {
-        
-        lat = Math.min(90, lat);
-        lat = Math.max(-90, lat);
-
-        Point point = project(lat, lng);
-        double canvasX = point.x + (mapWidth / 2);
-        double canvasY = (mapHeight / 2) - point.y;
-        return new Point(canvasX, canvasY + 750);
     }
 
     public Point project(double lat, double lng) {

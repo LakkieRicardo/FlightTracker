@@ -11,7 +11,7 @@ import lakkie.flight.globepanel.ProjectionConverter.Point;
 
 public record TestPoint(String label, int x, int y) {
 
-    public static void loadFromFile(List<TestPoint> testPointList, InputStream file, ProjectionConverter projector, boolean useFunc2) {
+    public static void loadFromFile(List<TestPoint> testPointList, InputStream file, ProjectionConverter projector) {
         StringBuilder jsonContents = new StringBuilder();
         Scanner scanner = new Scanner(file);
 
@@ -32,11 +32,7 @@ public record TestPoint(String label, int x, int y) {
             double lng = (double)jsonPoint.get("Longitude");
 
             Point projectedPoint;
-            if (useFunc2) {
-                projectedPoint = projector.projectToScreen2(lat, lng);
-            } else {
-                projectedPoint = projector.projectToScreen1(lat, lng);
-            }
+            projectedPoint = projector.projectToScreen(lat, lng);
 
             testPointList.add(new TestPoint(label, (int)projectedPoint.x(), (int)projectedPoint.y()));
         }
